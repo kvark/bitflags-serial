@@ -53,40 +53,26 @@ macro_rules! bitflags_serial {
             }
         }
 
-        impl<'de> $crate::_serde::de::Visitor<'de> for $BitFlags {
-            type Value = Self;
-            fn expecting(&self, formatter: &mut $crate::_core::fmt::Formatter) -> $crate::_core::fmt::Result {
-                write!(formatter, "sequence of bit constants")
-            }
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: $crate::_serde::de::SeqAccess<'de>
-            {
-                let mut bits = 0;
-                while let Some(single) = seq.next_element::<$crate::_SingleBit<Self>>()? {
-                    bits |= single.0.bits;
-                }
-                Ok($BitFlags { bits })
-            }
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: $crate::_serde::de::Error,
-            {
-                match $crate::_core::str::from_utf8(v).unwrap() {
-                    $(
-                        stringify!($Flag) => Ok($BitFlags { bits: $value } ),
-                    )+
-                    other => Err(E::unknown_variant(other, &[]))
-                }
-            }
-        }
-
         impl<'de> $crate::_serde::Deserialize<'de> for $BitFlags {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: $crate::_serde::Deserializer<'de>
             {
-                deserializer.deserialize_seq($BitFlags { bits: 0 })
+                #[derive(Deserialize)]
+                #[repr(C)]
+                enum __FlagEnum {
+                    $(
+                        #[allow(non_snake_case)]
+                        $(? #[$attr $($args)*])*
+                        $Flag = $value,
+                    )+
+                }
+
+                let mut bits = 0;
+                for value in Vec::<__FlagEnum>::deserialize(deserializer)? {
+                    bits |= value as $T;
+                }
+                Ok($BitFlags { bits })
             }
         }
 
@@ -96,22 +82,16 @@ macro_rules! bitflags_serial {
             {
                 use $crate::_serde::ser::SerializeSeq;
 
-                $(
-                    #[allow(non_snake_case)]
-                    struct $Flag;
-                    impl $crate::_serde::Serialize for $Flag {
-                        fn serialize<Ss>(&self, serializer: Ss) -> Result<Ss::Ok, Ss::Error>
-                            where Ss: $crate::_serde::Serializer
-                        {
-                            serializer.serialize_unit_variant("", 0, stringify!($Flag))
-                        }
-                    }
-                )+
+                #[derive(Serialize)]
+                enum __FlagEnum {
+                    $(
+                        #[allow(non_snake_case)]
+                        $(? #[$attr $($args)*])*
+                        $Flag,
+                    )+
+                }
 
-                // the `__BitFlags` trait is copied from `Debug` implementation of `bitflags!`
-
-                // Unconditionally define a check for every flag, even disabled
-                // ones.
+                // This is taken from `Debug` implementation of `bitflags!`
                 #[allow(non_snake_case)]
                 trait __BitFlags {
                     $(
@@ -119,9 +99,6 @@ macro_rules! bitflags_serial {
                         fn $Flag(&self) -> bool { false }
                     )+
                 }
-
-                // Conditionally override the check for just those flags that
-                // are not #[cfg]ed away.
                 impl __BitFlags for $BitFlags {
                     $(
                         __impl_bitflags! {
@@ -138,7 +115,7 @@ macro_rules! bitflags_serial {
                 let mut seq = serializer.serialize_seq(None)?;
                 $(
                     if <$BitFlags as __BitFlags>::$Flag(self) {
-                        seq.serialize_element(&$Flag)?;
+                        seq.serialize_element(&__FlagEnum::$Flag)?;
                     }
                 )+
                 seq.end()
