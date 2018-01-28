@@ -1,0 +1,11 @@
+[package]
+name = "bitflags-serial"
+version = "0.1.0"
+authors = ["Dzmitry Malyshau <kvark@mozilla.com>"]
+
+[dependencies]
+serde = "1"
+
+[dev-dependencies]
+bitflags = "1"
+ron = "0.1"
