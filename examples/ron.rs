@@ -3,6 +3,8 @@ extern crate bitflags;
 #[macro_use]
 extern crate bitflags_serial;
 extern crate ron;
+#[macro_use]
+extern crate serde_derive;
 
 bitflags_serial!{
     struct Bits: u8 {
