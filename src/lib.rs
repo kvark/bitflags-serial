@@ -68,6 +68,12 @@ macro_rules! bitflags_serial {
                 }
                 Ok($BitFlags { bits })
             }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: $crate::_serde::de::Error,
+            {
+                self.visit_bytes(v.as_bytes())
+            }
             fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
             where
                 E: $crate::_serde::de::Error,
